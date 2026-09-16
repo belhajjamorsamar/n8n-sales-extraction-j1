@@ -1,0 +1,287 @@
+{
+  "name": "automation extraction data j-1",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 7
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -336,
+        0
+      ],
+      "id": "5a0d1beb-f24e-4f08-a561-0ea5b0cab75a",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const yesterday = new Date();\nyesterday.setDate(yesterday.getDate() - 1);\n\nconst dateJ1 = yesterday.toISOString().split('T')[0];\n\nreturn [{ json: { date_j1: dateJ1 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -112,
+        0
+      ],
+      "id": "57dccffd-5647-4e73-bbe8-19739bdb5eec",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:8123/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept-Encoding",
+              "value": "identity"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "=text/sql",
+        "body": "=SELECT      Date,     Magasin,     Produit,     Designation,     Famille,     SousFamille,     Rayon,     saison,     sum(Quantite) AS QuantiteTotale FROM ventes_flat WHERE Date = '{{ $json.date_j1 }}' GROUP BY      Date,     Magasin,     Produit,     Designation,     Famille,     SousFamille,     Rayon,     saison ORDER BY QuantiteTotale DESC FORMAT CSVWithNames",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        112,
+        0
+      ],
+      "id": "790918f1-2df0-45eb-9f1a-202b654d731e",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "jIHDQDWTyCeA5clh",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst textData = binaryData.toString('utf-8');\n\nconst lines = textData.trim().split('\\n');\nconst headers = lines[0].replace(/\"/g, '').split(',');\n\nconst items = [];\nfor (let i = 1; i < lines.length; i++) {\n  if (!lines[i].trim()) continue;\n  const values = lines[i].replace(/\"/g, '').split(',');\n  const row = {};\n  \n  headers.forEach((header, index) => {\n    let val = values[index] ? values[index].trim() : '';\n    val = val.replace(/spÃ©ciaux/g, 'spéciaux');\n    \n    if (header.toLowerCase().includes('quantite')) {\n      row[header] = parseFloat(val) || 0;\n    } else {\n      row[header] = val;\n    }\n  });\n  \n  items.push({ json: row });\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        0
+      ],
+      "id": "8a41c4fa-d703-41ae-b313-34648b129c5a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        0
+      ],
+      "id": "60645eca-5277-44c9-8800-c7abf999bb52",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "fromEmail": "belhajjamorsamar@gmail.com",
+        "toEmail": "anouar.tracking@gmail.com",
+        "subject": "Vente j-1 ",
+        "html": "=<p>Bonjour,</p>\n<p>Veuillez trouver ci-dessous le lien pour télécharger le fichier des ventes J-1 :</p>\n<p>\n  <a href=\"{{ $node['Upload file'].json.webContentLink }}\" target=\"_blank\" style=\"background-color: #007bff; color: white; padding: 10px 15px; text-decoration: none; border-radius: 4px; display: inline-block;\">\n    Télécharger le fichier Excel\n  </a>\n</p>\n<p>Cordialement,</p>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1232,
+        0
+      ],
+      "id": "d027fd98-e80a-4358-a079-5595ebcd3d71",
+      "name": "Send an Email",
+      "webhookId": "1f2f4100-93cd-4f61-865b-10d51a6be1ba",
+      "credentials": {
+        "smtp": {
+          "id": "dxUmS5YlipujIUyJ",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "Ventes_{{ $now.format('YYYY-MM-DD') }}.xlsx",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        784,
+        0
+      ],
+      "id": "123953d3-b8f6-4a50-ad48-2e3cb1418886",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "lN3cvyJBWjOvtp4U",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{$json.id}}",
+          "mode": "id"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "a8f20e9f-3242-431b-9511-e6ba329f7330",
+      "name": "Share file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "lN3cvyJBWjOvtp4U",
+          "name": "Google Drive account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Share file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share file": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "988ffefd-2d3b-424c-8b2a-335790fcd417",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fca0c14774df9e1988b2ecfeb6fe33752ae3e9c8f2b53d1994788d5947d303db"
+  },
+  "nodeGroups": [],
+  "id": "WFSyOBYXPdwfkHH9",
+  "tags": []
+}
